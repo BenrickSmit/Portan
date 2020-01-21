@@ -29,17 +29,17 @@ import pprint
 
 def get_emails(string_input_text):
 	email_regex = re.compile("""(
-		([a-zA-Z.-0-9]+)		# Create a character class
+		([\-a-zA-Z.0-9]+)		# Create a character class
 		@						# The @ sign
-		([a-zA-Z.-0-9]+)		# Create a character class
+		([\-a-zA-Z.0-9]+)		# Create a character class
 	)""", re.VERBOSE)
 	list_emails = email_regex.findall(string_input_text)
 	return list_emails
 
 def get_hyperlinks(string_input_text):
 	hyperlinks_regex = re.compile("""(
-		(http:|https|www)					# The basic indicator of most URLs
-		([a-zA-Z0-9.:?/=]+)					# Create a new character class that should return all the input urls
+		(http:|https|www)   					    # The basic indicator of most URLs
+		([a-zA-Z0-9.:\&\?_=\-\/]+)					# Create a new character class that should return all the input urls
 	)""", re.VERBOSE)
 	list_hyperlinks = hyperlinks_regex.findall(string_input_text)
 	return list_hyperlinks
@@ -64,14 +64,14 @@ def main():
 	list_tuple_emails = get_emails(string_input)
 	list_tuple_hyperlinks = get_hyperlinks(string_input)
 
-	if(is_empty_list(list_tuple_emails)):
+	if(not is_empty_list(list_tuple_emails)):
 		for index in list_tuple_emails:
 			list_emails.append(index[0])
 	else:
 		list_emails.append("No Emails Found.")
 
 
-	if(is_empty_list(list_tuple_hyperlinks)):	
+	if(not is_empty_list(list_tuple_hyperlinks)):	
 		for index in list_tuple_hyperlinks:
 			list_hyperlinks.append(index[0])
 	else:
