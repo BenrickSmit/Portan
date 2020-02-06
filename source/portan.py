@@ -39,70 +39,138 @@ import pprint
 
 # Class defition
 class Portan:
+    __list_possible_arguments = []                  # Used to check the consistency of the arguments passed
+
     # Text Numbers
-    __int_num_emails = 0
-    __int_num_hyperlinks = 0
-    __int_num_text = 0
-    __int_num_html_tags = 0
+    __int_num_emails = 0                            # Contains the number of email links found
+    __int_num_hyperlinks = 0                        # Contains the number of hyperlinks found
+    __int_num_text = 0                              # Contains the number of textual characers found - that are human readable by non-programmers
+    __int_num_html_tags = 0                         # Displays the number of html tags found within the text
 
     # Provided link
-    __string_provided_url = "N/A"
+    __string_provided_url = "N/A"                   # Contains the url provided
 
     # Downloaded html data
-    __string_returned_webpage = "N/A"
-    __string_status_code = "N/A"
-    __string_header_information = "N/A"
+    __string_returned_webpage = "N/A"               # Contains the text retured by urllib
+    __string_status_code = "N/A"                    # Displays codes such as 200 - successful, 404 - page not found, etc
+    __dict_header_info = "N/A"                      # Contains the webpage header info in a dictionary 
 
     # Webpage Information
-    __string_last_modified = "N/A"
-    __string_content_language = "N/A"
-    __string_current_date = "N/A"
-    __string_content_type = "N/A"
-    __string_content_length_bytes = "N/A"
+    __string_last_modified = "N/A"                  # Displays when the website was last modified
+    __string_content_language = "N/A"               # Displays the language of the website
+    __string_current_date = "N/A"                   # Displays the current date of access
+    __string_content_type = "N/A"                   # Displays the website type of content
+    __string_content_length_bytes = "N/A"           # Contains how many bytes are available
 
     # Lists [and strings] of data retrieved
-    __list_emails = ["None"]            # Contains the found emails
-    __list_hyperlinks = ["None"]        # Contains the found hyperlinks
-    __list_html_tags = ["None"]         # Contains all the html tags found in the website
-    __string_webpage_plain_text = ""    # Contains the normal plaintext based on the html document without tags, comments, or javascript
+    __list_emails = ["None"]                        # Contains the found emails
+    __list_hyperlinks = ["None"]                    # Contains the found hyperlinks
+    __list_html_tags = ["None"]                     # Contains all the html tags found in the website
+    __string_webpage_plain_text = ""                # Contains the normal plaintext based on the html document without tags, comments, or javascript
 
-    # Constructor taking arguments
+    # Set program flags for use
+    #   NOTE: certain flags override output, such as --help, --license, and --version
+    __flag_verbose = False
+    __flag_minimal = False
+    __flag_license = False
+    __flag_version = False
+    __flag_minimal = False
+    __flag_no_output = False
+    __flag_write = False
+    __flag_emails = False
+    __flag_hyperlinks = False
+    __flag_plaintext = False
+    __flag_search = False
+
+
+    # Constructor taking arguments from the commandline
     def __init__(self, list_arguments):
+        # Dictate and set the arguments that are supported by portan - Remember to delete this later
+        self.__list_possible_arguments = ["--verbose", "--version", "--help", "--minimal", "--no-output",\
+             "--license", "--emails", "--hyperlinks", "--write", "--plaintext", "--search"]
+
+        # Remove the first part of the list, as this will always be the current file path
+        list_arguments.pop(0)
+
+        
+        # Check which flags are active in the list, but only those which override processing the url
+        # and require no url to be present.
+        if (self._find_argument(list_arguments, "--version")):
+            self._version_menu()
+            return None
+        elif (self._find_argument(list_arguments, "--help")):
+            self._help_menu()
+            return None
+        elif (self._find_argument(list_arguments, "--license")):
+            self._license_menu()
+            return None
+
+
+        # Eliminate the arguments from the list, and set the required flags
+        if (self._find_argument(list_arguments, "--verbose")):
+            self.__flag_verbose = True
+        if (self._find_argument(list_arguments, "--minimal")):
+            self.__flag_minimal = True
+        if (self._find_argument(list_arguments, "--no-output")):
+            self.__flag_no_output = True
+        if (self._find_argument(list_arguments, "--emails")):
+            self.__flag_emails = True
+        if (self._find_argument(list_arguments, "--hyperlinks")):
+            self.__flag_hyperlinks = True
+        if (self._find_argument(list_arguments, "--write")):
+            self.__flag_write = True
+        if (self._find_argument(list_arguments, "--plaintext")):
+            self.__flag_plaintext = True
+        if (self._find_argument(list_arguments, "--search")):
+            self.__flag_search = True
+
+        # Determine whether the program has any mutually exclusive arguments active
+        if (int(self.__flag_verbose) + int(self.__flag_minimal) + int(self.__flag_no_output)) > 1:
+            print("Error: Cannot contain more than one mutually exclusive tags. \nChoose one: --verbose, --minimal, or --no_output")
+            return None     # To exit the program
+
+        # Should --minimal be set, don't display any message, should --verbose be set, display all messages
+        # PS, the first argument should be the url, if not, some errors will occur
+        self.get(list_arguments[0], self.__flag_verbose)
+
+        # Should --no-output be set, get the information, but display nothing
+        self.print_details(self.__flag_no_output)
+
         return None
 
-    # Constructor not requiring arguments
-    def __init__(self):
-        return None
 
-
-    def get(self, string_received_url):
+    def get(self, string_received_url, bool_is_verbose = False):
         # Retrieve the data from the web
+        self.__log("Retrieve Server Data...", bool_is_verbose)
         file_object = urllib.request.urlopen(string_received_url)
 
         # Set the webpage data
+        self.__log("Extract Website Data...", bool_is_verbose)
         self.__string_provided_url = string_received_url
         self.__string_status_code = file_object.getcode()
-        self.__string_returned_webpage = file_object.read().decode().replace("\n", "", -1)    # Remove all newlines as well, gets a few more tags
+        self.__string_returned_webpage = file_object.read().decode().replace("\n", "", -1)    # Remove all newlines as well, gets a few more tags later on
         
         # Extract the necessary header information
+        self.__log("Extract Header Data...", bool_is_verbose)
         self.__dict_header_info = file_object.info()
         self._get_webpage_information()
 
         # Get all html tags
+        self.__log("Extract HTML, CSS, JavaScript Data...", bool_is_verbose)
         self._find_all_tags()
 
         # Get normal text
+        self.__log("Extract Plaintext...", bool_is_verbose)
         self._find_all_text()
 
         # Get all hyperlinks
+        self.__log("Extract Hyperlinks...", bool_is_verbose)
         self._find_all_hyperlinks()
 
         # Get all emails
+        self.__log("Extract Emails...\n", bool_is_verbose)
         self._find_all_emails()
 
-        # Print the data retrieved
-        self.print_details()
-        
         return None
 
 
@@ -119,12 +187,14 @@ class Portan:
 
 
     # print the details to the screen
-    def print_details(self):
-        # Print the required data to the screen
+    def print_details(self, bool_no_output = False):
+        # Print the required data to the screen if allowed
+        if(bool_no_output):
+            return None
 
         # Print the License and Version information of Portan
         # TODO
-        print("<LICENSE & VERSION INFO GOES HERE>")
+        self._license_menu()
 
         # Print the URL Accessed & Header information
         print("\n\nACCESSED: \t\t%s\nSTATUS CODE: \t\t%s\nLAST MODIFIED: \t\t%s\nDATE ACCESSED: \t\t%s\nCONTENT TYPE: \t\t%s\nCONTENT LANGUAGE: \t%s\nRECEIVED BYTES: \t%s\n\n" \
@@ -330,86 +400,117 @@ class Portan:
         return list_to_return
 
 
+    # Find an argument in a list of arguments passed to the program
+    def _find_argument(self, list_arguments, string_item_to_find):
+        # This function takes a list of arguments passed to the program and looks to find a specified
+        # argument. Returns true if it is found, and false if not
+        bool_argument_found = False
+        
+        # Look for the argument
+        try:
+            if (list_arguments.index(string_item_to_find)):
+                bool_argument_found = True
+        except ValueError:
+            bool_argument_found = False
+
+        return bool_argument_found
+
+
+    # Displays the help menu
+    def _help_menu(self):
+        # Create the string to display
+        string_help_data = """Portan requires a number of arguments. See the list and example below.
+    Portan will require a URL to search. Should none be present
+    Portan will cease to execute and display an error.
+
+        >> portan.py [url] [arguments]
+    
+     --verbose                  Shows all steps Portan takes. 
+     --version                  Displays the version of Portan. 
+     --help                     Displays help information. 
+     --minimal                  Shows basic information. Used 
+                                by default. 
+     --no-output                Displays nothing except success 
+                                or failure. 
+     --license                  Displays the license under which 
+                                Portan was published together with
+                                any additional information.
+     --write [path]             Creates files containing the 
+                                information found in the designated
+                                path. If no path is provided, 
+                                places the files in application 
+                                directory.
+     --emails                   Displays the emails found
+     --hyperlinks               Displays the hyperlinks found
+     --plain-text               Displays the obtained plaintext
+     --search ["to_search"]     Searches for the text "to_search" in 
+                                the plaintext found on the website. 
+                                Should the text be more than one word
+                                enclose it in double quotes, i.e. 
+                                --search "words to search" """
+
+        # Remember to add in recursive searching
+
+        # Display the help string
+        print(string_help_data)
+        return None
+
+
     # Displays the Portan Version
-    def _version(self):
+    def _version_menu(self):
         print("Portan v1.0.0\n")
         return None
 
 
+    # Display the license under which Portan is published
+    def _license_menu(self):
+        string_license = """# Copyright (C) 2020 Benrick Smit <metatronicprogramming@hotmail.com>
+#
+# Portan is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Portan is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program.  If not, see <http://www.gnu.org/licenses/>."""
+
+        print(string_license)
 
     
-# Write the data to a file in a folder called retrieved_data
-def write_files(list_emails, list_urls, list_text, list_reduced_text):
-	if not os.path.exists("retrieved_data"):
-		os.mkdir("retrieved_data")
+    # Displays a message for use when using the flag --verbose
+    def __log(self, string_to_display, bool_display_condition):
+        # This function will only display a message should bool_display_condition is ture
+        if (bool_display_condition):
+            print("<<verbose>> " + string_to_display)
 
-    # Create the file paths
-	string_email_file_path = os.path.join("retrieved_data", "emails.txt")
-	string_url_file_path = os.path.join("retrieved_data", "urls.txt")
-	string_text_file_path = os.path.join("retrieved_data", "text.txt")
-	string_reduced_file_path = os.path.join("retrieved_data", "reduced_text.txt")
-	
-	# Write the file
-	email_file_object = open(string_email_file_path, "w")
-	url_file_object = open(string_url_file_path, "w")
-	text_file_object = open(string_text_file_path, "w")
-	reduced_file_object = open(string_reduced_file_path, "w")
-
-	email_file_object.write("\n".join(list_emails))
-	url_file_object.write("\n".join(list_urls))
-	text_file_object.write("\n".join(list_text))
-	reduced_file_object.write("\n".join(list_reduced_text))
-
-    # Close the files
-	email_file_object.close()
-	url_file_object.close()
-	text_file_object.close()
-	reduced_file_object.close()
+        return None
 
 
-def argument_search(list_arguments):
-    # Based on the passed system arguments different information will be displayed.
-    # Basic Outline: require at least one argument, the url. If not, display help
-    # Tags Outline: --version, --help, --minimal, --no-output, --license, --show-emails,
-    # --show-hyperlinks, --show-text
-
-    # Erase the first argument form the list. Why? It only contains the name of the program
-    #list_arguments.pop(0)
-    
-    string_help_data = """Portan requires a number of arguments. See the list below.
-    
-     --verbose              Shows all steps Portan takes. 
-     --version              Displays the version of Portan. 
-     --help                 Displays help information. 
-     --minimal              Shows basic information. Used 
-                            by default. 
-     --no-output            Displays nothing except success 
-                            or failure. 
-     --license              Displays the license under which 
-                            Portan was published together with
-                            any additional information.
-     --write [path]         Creates files containing the 
-                            information found in the designated
-                            path. If no path is provided, 
-                            places the files in application 
-                            directory.
-     --emails               Displays the emails found
-     --hyperlinks           Displays the hyperlinks found
-     --plain-text           Displays the obtained plaintext"""
-
-    return None
 
 # Main function which controls the execution of the program
 def main():
-    # TODO: Get arguments passed && possible switched that define behaviour, e.g. --version, --help, --minimal, --no-output, --license
-    argument_search(sys.argv)  # Convert the item to a set and back to remove multiple arguments    
-
-
     # Create the portan object, and pass the relevant switches
-    portan = Portan()
+    list_to_pass = list(sys.argv)
+    # To account for building the program in an IDE
+    #list_to_pass.append(r"https://en.wikipedia.org/wiki/Linus")
+    #list_to_pass.append(r"https://www.youtube.com/watch?v=rei5vMQmD4Q")
+    #list_to_pass.append(r"https://www.ohayosensei.com/current-edition.html")
+    #list_to_pass.append(r"https://stackoverflow.com/questions/6038061/regular-expression-to-find-urls-within-a-string")
+    list_to_pass.append(r"https://en.wikipedia.org/wiki/Cat")
+    list_to_pass.append("--verbose")
+    #list_to_pass.append("--minimal")
+
+    portan = Portan(list_to_pass)
+    
+    # Check the actual links
     #portan.get(r"https://www.youtube.com/watch?v=rei5vMQmD4Q")                                                  # EMAILS: 0; URLS: 48  # Excludes local links found in href="" tags
     #portan.get(r"https://www.ohayosensei.com/current-edition.html")                                             # EMAILS: 113; URLS: 106
-    portan.get(r"https://en.wikipedia.org/wiki/Linus")                                                          # EMAILS: 0; URLS: 26 
+    #portan.get(r"https://en.wikipedia.org/wiki/Linus")                                                          # EMAILS: 0; URLS: 26 
     #portan.get(r"https://stackoverflow.com/questions/6038061/regular-expression-to-find-urls-within-a-string")  # EMAILS: 2; URLS: 192  # !Error, recognizes a url with an @ in it as email.
     #portan.get(r"https://en.wikipedia.org/wiki/Cat")                                                            # EMAILS: 0; URLS: 472  
 
@@ -424,6 +525,4 @@ main()
 # Get the links from the tags and add them to the hyperlinks by making sure that all relative links are changed to proper URLS
 # Remove the URLS from the email list
 # 
-# Add in the "command-line arguments that will allow different information, including searching the page
-#
 # Add in the urllib error checking for urls that do not exist
