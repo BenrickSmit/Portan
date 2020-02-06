@@ -321,31 +321,39 @@ class Portan:
 
     # Display all emails
     def display_emails(self, bool_no_output = False):
-        # Display a list of the emails and a menu
-        print("\n\nEMAILS:\n-------\n")
+        if (not bool_no_output):
+            # Display a list of the emails and a menu
+            print("\n\nEMAILS:\n-------\n")
 
-        # Cycle through the image list
-        for element in self.__list_emails:
-            print(element)
+            # Cycle through the image list
+            for element in self.__list_emails:
+                print(element)
 
         return None
 
 
     # Display all hyperlinks
     def display_hyperlinks(self, bool_no_output = False):
-        # Display a list of the emails and a menu
-        print("\n\nHYPERLINKS:\n-----------\n")
+        if (not bool_no_output):
+            # Display a list of the emails and a menu
+            print("\n\nHYPERLINKS:\n-----------\n")
 
-        # Cycle through the image list
-        for element in self.__list_hyperlinks:
-            print(element)
+            # Cycle through the image list
+            for element in self.__list_hyperlinks:
+                print(element)
 
         return None
 
 
     # Display all images
     def display_images(self, bool_no_output = False):
+        if (not bool_no_output):
+            # Display a list of the emails and a menu
+            print("\n\nIMAGES:\n-------\n")
 
+            # Cycle through the image list
+            for element in self.__list_hyperlinks:
+                print(element)
         return None
 
 
@@ -566,11 +574,12 @@ def main():
     # To account for building the program in an IDE
     #list_to_pass.append(r"https://en.wikipedia.org/wiki/Linus")
     #list_to_pass.append(r"https://www.youtube.com/watch?v=rei5vMQmD4Q")
-    #list_to_pass.append(r"https://www.ohayosensei.com/current-edition.html")
+    list_to_pass.append(r"https://www.ohayosensei.com/current-edition.html")
     #list_to_pass.append(r"https://stackoverflow.com/questions/6038061/regular-expression-to-find-urls-within-a-string")
-    list_to_pass.append(r"https://en.wikipedia.org/wiki/Cat")
+    #list_to_pass.append(r"https://en.wikipedia.org/wiki/Cat")
     list_to_pass.append("--verbose")
     list_to_pass.append("--emails")
+    list_to_pass.append("--hyperlinks")
 
     portan = Portan(list_to_pass)
     
