@@ -81,28 +81,34 @@ class Portan:
     __flag_hyperlinks = False
     __flag_plaintext = False
     __flag_search = False
+    __flag_images = False
 
 
     # Constructor taking arguments from the commandline
     def __init__(self, list_arguments):
         # Dictate and set the arguments that are supported by portan - Remember to delete this later
         self.__list_possible_arguments = ["--verbose", "--version", "--help", "--minimal", "--no-output",\
-             "--license", "--emails", "--hyperlinks", "--write", "--plaintext", "--search"]
+             "--license", "--emails", "--hyperlinks", "--write", "--plaintext", "--search", "--images"]
 
         # Remove the first part of the list, as this will always be the current file path
         list_arguments.pop(0)
 
+        # Determine whether there are any arguments for Portan to use
+        if len(list_arguments) < 1:
+            print("Error: provided no arguments.\n")
+            self.help_menu()
+            return None
         
         # Check which flags are active in the list, but only those which override processing the url
         # and require no url to be present.
         if (self._find_argument(list_arguments, "--version")):
-            self._version_menu()
+            self.version_menu()
             return None
         elif (self._find_argument(list_arguments, "--help")):
-            self._help_menu()
+            self.help_menu()
             return None
         elif (self._find_argument(list_arguments, "--license")):
-            self._license_menu()
+            self.license_menu()
             return None
 
 
@@ -123,18 +129,35 @@ class Portan:
             self.__flag_plaintext = True
         if (self._find_argument(list_arguments, "--search")):
             self.__flag_search = True
+        if (self._find_argument(list_arguments, "--images")):
+            self.__flag_images = True
 
         # Determine whether the program has any mutually exclusive arguments active
         if (int(self.__flag_verbose) + int(self.__flag_minimal) + int(self.__flag_no_output)) > 1:
             print("Error: Cannot contain more than one mutually exclusive tags. \nChoose one: --verbose, --minimal, or --no_output")
             return None     # To exit the program
 
+        # Display the license information
+        self.license_menu(self.__flag_no_output)
+
         # Should --minimal be set, don't display any message, should --verbose be set, display all messages
         # PS, the first argument should be the url, if not, some errors will occur
         self.get(list_arguments[0], self.__flag_verbose)
 
         # Should --no-output be set, get the information, but display nothing
-        self.print_details(self.__flag_no_output)
+        self.display_details(self.__flag_no_output)
+
+        # Should --no-output be set, don't display the emails even if the the required tag is active 
+        if (self.__flag_emails):
+            self.display_emails(self.__flag_no_output)
+
+        # Should --no-output be set, don't display the hyperlinks even if the required tag is active
+        if (self.__flag_hyperlinks):
+            self.display_hyperlinks(self.__flag_no_output)
+
+        # Should --no-output be set, don't display the images even if the required tag is active
+        if (self.__flag_images):
+            self.display_images(self.__flag_no_output)
 
         return None
 
@@ -142,7 +165,11 @@ class Portan:
     def get(self, string_received_url, bool_is_verbose = False):
         # Retrieve the data from the web
         self.__log("Retrieve Server Data...", bool_is_verbose)
-        file_object = urllib.request.urlopen(string_received_url)
+        try:
+            file_object = urllib.request.urlopen(string_received_url)
+        except urllib.error.URLError as error:
+            print(error.reason)
+            return None
 
         # Set the webpage data
         self.__log("Extract Website Data...", bool_is_verbose)
@@ -187,22 +214,18 @@ class Portan:
 
 
     # print the details to the screen
-    def print_details(self, bool_no_output = False):
+    def display_details(self, bool_no_output = False):
         # Print the required data to the screen if allowed
         if(bool_no_output):
             return None
-
-        # Print the License and Version information of Portan
-        # TODO
-        self._license_menu()
 
         # Print the URL Accessed & Header information
         print("\n\nACCESSED: \t\t%s\nSTATUS CODE: \t\t%s\nLAST MODIFIED: \t\t%s\nDATE ACCESSED: \t\t%s\nCONTENT TYPE: \t\t%s\nCONTENT LANGUAGE: \t%s\nRECEIVED BYTES: \t%s\n\n" \
             % (self.__string_provided_url, self.__string_status_code, self.__string_last_modified, self.__string_current_date, self.__string_content_type, self.__string_content_language,self.__string_content_length_bytes))
 
         # Print the status information on found emails and hyperlinks TODO (Add in text size, reduced text_size, image links)
-        print("EMAILS: \t\t%s\nHYPERLINKS: \t\t%s\nSEARCHABLE TEXT: \t%s BYTES" \
-            % (self.__int_num_emails, self.__int_num_hyperlinks, self.__int_num_text))
+        print("EMAILS: \t\t%s\nHYPERLINKS: \t\t%s\nTAGS: \t\t\t%s\nSEARCHABLE TEXT: \t%s BYTES" \
+            % (self.__int_num_emails, self.__int_num_hyperlinks, self.__int_num_html_tags, self.__int_num_text))
 
         return None
 
@@ -240,26 +263,48 @@ class Portan:
 
     # Find all the hyperlinks in the text
     def _find_all_hyperlinks(self):
-        # Create a regex to identify nearly all hyperlinks
+        # Create a regex to identify nearly all hyperlinks, not only in the text, but also in the <a> tags
+        # Create regex to find all links containing https or https
         hyperlink_regex = re.compile("""(?P<full_url>
             # URLS are very peculiar and quite a few have been made. We can't just match www.google.com, as github.com also exits.
             # Additionally there are protocosl and ports sometimes specified as well, for example https://www.google.com, or localhost:8080.
             # Urls can also not start with special characters, such as @.,%&#-
             # This regex will try and find all of them given these conditions.
 
-            (?![@.,%&#\-]+)                                                  # Match only if it doesn't match with a special character
-            (?P<protocol>(http|https)\://)                                    # Optional schemes that indicate protocols and "://"; matches minimally   ;removed \w{2,10}
-            ([a-zA-Z0-9\u00a1-\uffff?\-=#:;%@&.,$+_~]+?)                     # Host names must be at least one character long, but will be separated by periods
-            (\.[a-zA-Z0-9\u00a1-\uffff?\-=#:;%@&.,$+_~]+?)                     # Host names must be at least one character long, but will be separated by periods
-            (\.[a-zA-Z0-9\u00a1-\uffff?\-=#:;%@&.,$+_~]+?)                     # Host names must be at least one character long, but will be separated by periods             
-            (?![@])                                                          # Matches only if the next character is not @; prevent recognizing emails
-            (?(protocol)((:\d)+))?                                           # Port matching only if there was a protocol
+            (?![@.,%&#\-]+)                                                 # Match only if it doesn't match with a special character
+            (?P<protocol>(http|https)\://)                                  # Optional schemes that indicate protocols and "://"; matches minimally   ;removed \w{2,10}
+            ([a-zA-Z0-9\u00a1-\uffff?\-=#:;%@&.,$+_~]+?)                    # Host names must be at least one character long, but will be separated by periods
+            (\.[a-zA-Z0-9\u00a1-\uffff?\-=#:;%@&.,$+_~]+?)                  # Host names must be at least one character long, but will be separated by periods
+            (\.[a-zA-Z0-9\u00a1-\uffff?\-=#:;%@&.,$+_~]+?)                  # Host names must be at least one character long, but will be separated by periods             
+            (?![@])                                                         # Matches only if the next character is not @; prevent recognizing emails
+            (?(protocol)((:\d)+))?                                          # Port matching only if there was a protocol
             ([a-zA-Z0-9\u00a1-\uffff?\-=#:;%@&.,\/$+_~]+)                   # The path of the url can contain any number of special characters
-            (?![.,?!\-])                                                     # The path cannot end on .,?!-            
+            (?![.,?!\-])                                                    # The path cannot end on .,?!-            
         )""", re.VERBOSE | re.UNICODE)
+
+        # Create regex to find partial hyperlinks located in the anchor tag (<a href="...">)
+        a_href_regex = re.compile("""(?P<a_href_urls>
+            href=(["'])(.*?)(["'])                                          # Find only the text witihn the <a href=""> parts of the tag
+        )""", re.VERBOSE)
 
         # Search the member variable for hyperlinks
         list_found_hyperlinks = self._from_tuple_to_list(hyperlink_regex.findall(self.__string_returned_webpage))
+        list_local_hyperlinks = self._from_tuple_to_list(a_href_regex.findall("".join(self.__list_html_tags)))
+        list_local_partial_hyperlinks = []
+
+        # Remove the unnecessary parts of the links & remove any complete links, leaving only partial links
+        for element in list_local_hyperlinks:
+            string_new_element = element[6:len(element)-1]
+            if not (str(string_new_element).startswith(r"//") or \
+                str(string_new_element).startswith("http")):
+                if not (str(string_new_element).startswith("/")):
+                    string_new_element = r"/" + string_new_element
+                # Add the links
+                list_local_partial_hyperlinks.append(self.__string_provided_url + string_new_element)
+
+        # Add the new links to the found hyperlinks
+        list_found_hyperlinks += list_local_partial_hyperlinks
+        list_local_partial_hyperlinks = []
 
         # Remove duplicates
         list_found_hyperlinks = self._remove_list_duplicates(list_found_hyperlinks)
@@ -270,6 +315,36 @@ class Portan:
 
         # Set the hyperlink information
         self.__int_num_hyperlinks = len(list_found_hyperlinks)
+
+        return None
+
+
+    # Display all emails
+    def display_emails(self, bool_no_output = False):
+        # Display a list of the emails and a menu
+        print("\n\nEMAILS:\n-------\n")
+
+        # Cycle through the image list
+        for element in self.__list_emails:
+            print(element)
+
+        return None
+
+
+    # Display all hyperlinks
+    def display_hyperlinks(self, bool_no_output = False):
+        # Display a list of the emails and a menu
+        print("\n\nHYPERLINKS:\n-----------\n")
+
+        # Cycle through the image list
+        for element in self.__list_hyperlinks:
+            print(element)
+
+        return None
+
+
+    # Display all images
+    def display_images(self, bool_no_output = False):
 
         return None
 
@@ -312,7 +387,7 @@ class Portan:
             (?P<css_tags>(<style[\s\S]*?\/>))?                                # Find the css tag opening style which is likely self-terminating
         )""", re.VERBOSE)
 
-        # Find all self-closing tag occurrences and return them
+        # Use the regex accordingly
         list_html_self_closing_tags = self._from_tuple_to_list(html_self_closing_tag_regex.findall(self.__string_returned_webpage))
         list_html_tags = self._from_tuple_to_list(html_tag_regex.findall(self.__string_returned_webpage))
         list_comment_tags = self._from_tuple_to_list(html_comment_regex.findall(self.__string_returned_webpage))
@@ -336,18 +411,8 @@ class Portan:
         # Cycle through all of the tags, and replace them with "" in the string
         string_new_html_text = self.__string_returned_webpage
 
-        # Additional information
-        file = open("string_html_text", 'w')
-        file.write(string_new_html_text)
-        file.close()
-
         for element in list_found_html_tags:
             string_new_html_text = string_new_html_text.replace(str(element), "", -1) # replace all
-
-        # Additional information
-        file = open("string_new_html_text", 'w')
-        file.write(string_new_html_text)
-        file.close()
 
         return string_new_html_text
 
@@ -417,7 +482,7 @@ class Portan:
 
 
     # Displays the help menu
-    def _help_menu(self):
+    def help_menu(self):
         # Create the string to display
         string_help_data = """Portan requires a number of arguments. See the list and example below.
     Portan will require a URL to search. Should none be present
@@ -442,6 +507,8 @@ class Portan:
                                 directory.
      --emails                   Displays the emails found
      --hyperlinks               Displays the hyperlinks found
+     --images                   Displays the hyperlinks that refer
+                                to images.
      --plain-text               Displays the obtained plaintext
      --search ["to_search"]     Searches for the text "to_search" in 
                                 the plaintext found on the website. 
@@ -457,16 +524,14 @@ class Portan:
 
 
     # Displays the Portan Version
-    def _version_menu(self):
+    def version_menu(self):
         print("Portan v1.0.0\n")
         return None
 
 
     # Display the license under which Portan is published
-    def _license_menu(self):
-        string_license = """# Copyright (C) 2020 Benrick Smit <metatronicprogramming@hotmail.com>
-#
-# Portan is free software: you can redistribute it and/or modify it
+    def license_menu(self, bool_no_output):
+        string_license = """# Portan is free software: you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
 # Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
@@ -479,7 +544,9 @@ class Portan:
 # You should have received a copy of the GNU General Public License along
 # with this program.  If not, see <http://www.gnu.org/licenses/>."""
 
-        print(string_license)
+        if (not bool_no_output):
+            print(string_license)
+        return None
 
     
     # Displays a message for use when using the flag --verbose
@@ -503,7 +570,7 @@ def main():
     #list_to_pass.append(r"https://stackoverflow.com/questions/6038061/regular-expression-to-find-urls-within-a-string")
     list_to_pass.append(r"https://en.wikipedia.org/wiki/Cat")
     list_to_pass.append("--verbose")
-    #list_to_pass.append("--minimal")
+    list_to_pass.append("--emails")
 
     portan = Portan(list_to_pass)
     
@@ -522,7 +589,6 @@ main()
 
 
 # TODO:
-# Get the links from the tags and add them to the hyperlinks by making sure that all relative links are changed to proper URLS
 # Remove the URLS from the email list
 # 
-# Add in the urllib error checking for urls that do not exist
+# Add in image link finding
