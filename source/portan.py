@@ -42,6 +42,7 @@ class Portan:
     __list_possible_arguments = []                  # Used to check the consistency of the arguments passed
 
     # Text Numbers
+    __int_num_images = 0                            # Contains the number of image links found
     __int_num_emails = 0                            # Contains the number of email links found
     __int_num_hyperlinks = 0                        # Contains the number of hyperlinks found
     __int_num_text = 0                              # Contains the number of textual characers found - that are human readable by non-programmers
@@ -67,6 +68,8 @@ class Portan:
     __list_hyperlinks = ["None"]                    # Contains the found hyperlinks
     __list_html_tags = ["None"]                     # Contains all the html tags found in the website
     __string_webpage_plain_text = ""                # Contains the normal plaintext based on the html document without tags, comments, or javascript
+    __list_image_hyperlinks = ["None"]              # Contains all the hyperlinks to images
+    __list_found_searched_strings = ["None"]        # contains the found results for all the searched strings
 
     # Set program flags for use
     #   NOTE: certain flags override output, such as --help, --license, and --version
@@ -92,6 +95,25 @@ class Portan:
 
         # Remove the first part of the list, as this will always be the current file path
         list_arguments.pop(0)
+
+        # Should the --search text be active, find what string to search for which is assumed to be one after
+        string_to_search_for = ""
+        try:
+            # Find the position of the argument
+            int_search_argument_position = list_arguments.index("--search")
+            
+            # Find the string, and try and match it to other tags to exclude and provide an error message if necessary
+            if (list_arguments[int_search_argument_position+1] in self.__list_possible_arguments):
+                print("Error: no string to search for specified...")
+                self.help_menu()
+                return None
+
+            # Should the string not be found in list of possible arguments, get the string to search for
+            string_to_search_for = list_arguments[int_search_argument_position+1]
+        
+        except:
+            # Do nothing
+            string_to_search_for = "N/A"
 
         # Determine whether there are any arguments for Portan to use
         if len(list_arguments) < 1:
@@ -159,6 +181,14 @@ class Portan:
         if (self.__flag_images):
             self.display_images(self.__flag_no_output)
 
+        # Should --no-output be set, don't display the searched text, even if the required tag is active
+        if (self.__flag_search):
+            self.display_search(string_to_search_for, self.__flag_no_output)
+
+        # This function only activates should the required argument be presented
+        if (self.__flag_write):
+            self.write_files()
+
         return None
 
 
@@ -197,6 +227,10 @@ class Portan:
         # Get all emails
         self.__log("Extract Emails...\n", bool_is_verbose)
         self._find_all_emails()
+
+        # Get all images
+        self.__log("Extract Images...\n", bool_is_verbose)
+        self._find_all_images()
 
         return None
 
@@ -293,6 +327,11 @@ class Portan:
         list_local_partial_hyperlinks = []
 
         # Remove the unnecessary parts of the links & remove any complete links, leaving only partial links
+        # This might be sketchy at best, but find the base-form of the link since it seems as if most websites link their
+        # images to the base hyperlink
+        string_base_provided_url = (\
+            re.compile("""(http(s)?:\/\/)([a-zA-Z0-9\u00a1-\uffff?\-=#:;%@&,$+_~]+)\.([a-zA-Z0-9\u00a1-\uffff?\-=#:;%@&,$+_~]+)\.([a-zA-Z0-9\u00a1-\uffff?\-=#:;%@&,$+_~]+)""", \
+            re.VERBOSE).search(self.__string_provided_url).group(0))
         for element in list_local_hyperlinks:
             string_new_element = element[6:len(element)-1]
             if not (str(string_new_element).startswith(r"//") or \
@@ -300,7 +339,7 @@ class Portan:
                 if not (str(string_new_element).startswith("/")):
                     string_new_element = r"/" + string_new_element
                 # Add the links
-                list_local_partial_hyperlinks.append(self.__string_provided_url + string_new_element)
+                list_local_partial_hyperlinks.append(string_base_provided_url + string_new_element)
 
         # Add the new links to the found hyperlinks
         list_found_hyperlinks += list_local_partial_hyperlinks
@@ -319,11 +358,37 @@ class Portan:
         return None
 
 
+    # Find all images
+    def _find_all_images(self):
+        # Create a regex that will search the list of hyperlinks to scan for any images
+        image_regex = re.compile("""(?P<image_hyperlinks>
+            (.+?.jpg)|                                  # JPEGS
+            (.+?.jpeg)|                                 # JPEGS
+            (.+?.gif)|                                  # GIFS
+            (.+?.png)|                                  # PNGS
+            (.+?.tiff)|                                 # TIFF
+            (.+?.jpg)|                                  # JPEGS
+            (.+?.bmp)                                   # BMP
+        )""", re.VERBOSE | re.UNICODE | re.IGNORECASE)
+
+        # Search the hyperlinks
+        list_images = self._from_tuple_to_list(image_regex.findall("\n".join(self.__list_hyperlinks)))
+
+        # Remove any duplicates
+        list_images = self._remove_list_duplicates(list_images)
+
+        # Set the image lists, and the number of images found
+        self.__list_image_hyperlinks = list_images
+        self.__int_num_images = len(list_images)
+
+        return None
+
+
     # Display all emails
     def display_emails(self, bool_no_output = False):
         if (not bool_no_output):
             # Display a list of the emails and a menu
-            print("\n\nEMAILS:\n-------\n")
+            print("\n\nEMAILS:\n-------")
 
             # Cycle through the image list
             for element in self.__list_emails:
@@ -336,7 +401,7 @@ class Portan:
     def display_hyperlinks(self, bool_no_output = False):
         if (not bool_no_output):
             # Display a list of the emails and a menu
-            print("\n\nHYPERLINKS:\n-----------\n")
+            print("\n\nHYPERLINKS:\n-----------")
 
             # Cycle through the image list
             for element in self.__list_hyperlinks:
@@ -349,11 +414,11 @@ class Portan:
     def display_images(self, bool_no_output = False):
         if (not bool_no_output):
             # Display a list of the emails and a menu
-            print("\n\nIMAGES:\n-------\n")
+            print("\n\nIMAGES:\n-------")
 
             # Cycle through the image list
-            for element in self.__list_hyperlinks:
-                print(element)
+            for element in self.__list_image_hyperlinks:
+                    print(element)
         return None
 
 
@@ -508,11 +573,9 @@ class Portan:
      --license                  Displays the license under which 
                                 Portan was published together with
                                 any additional information.
-     --write [path]             Creates files containing the 
-                                information found in the designated
-                                path. If no path is provided, 
-                                places the files in application 
-                                directory.
+     --write                    Creates files containing the 
+                                information found in the provided
+                                hyperlink
      --emails                   Displays the emails found
      --hyperlinks               Displays the hyperlinks found
      --images                   Displays the hyperlinks that refer
@@ -539,7 +602,7 @@ class Portan:
 
     # Display the license under which Portan is published
     def license_menu(self, bool_no_output):
-        string_license = """# Portan is free software: you can redistribute it and/or modify it
+        string_license = """\n# Portan is free software: you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
 # Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
@@ -556,7 +619,79 @@ class Portan:
             print(string_license)
         return None
 
+
+    # This function searches for the input text in the text found in-website
+    # should no results be found, display appropriate message, otherwise
+    # display however many characters are available (before and after) including 
+    # the searched text.
+    def display_search(self, string_to_search_for, bool_no_output):
+        # This function will accomplish this with the help of regex
+        string_to_return_regex = re.compile("""(?P<full_result>
+            (.+?)                                     # This will return a number of characters available up to the string until a newline is found
+            ("""+string_to_search_for+""")            # The actual string to search for
+            (.+?)                                     # This will return a number of characters available after the string until a newline is found
+        )""", re.VERBOSE | re.UNICODE | re.IGNORECASE)
+        
+        # Find the actual input
+        list_found_strings = self._from_tuple_to_list(string_to_return_regex.findall(self.__string_webpage_plain_text))
+
+        # Display the results in order
+        if (not bool_no_output) and (not (list_found_strings == None)):
+            print("\nSEARCH RESULTS FOR: "+string_to_search_for)
+            print("--------------------"+"-"*len(string_to_search_for))
+            for element in list_found_strings:
+                print("<..." + element + "...>")
+
+
+        # Set the required memeber variable for writing if necessary
+        self.__list_found_searched_strings = list_found_strings
+
+        return None
     
+
+    # This function will create files containing the information found in the hyperlink
+    def write_files(self):
+        # Create the file to strore the general data
+        file_general_data = open(os.getcwd() + "/../general_output.txt", 'w')
+        file_general_data.write("\n\nACCESSED: \t\t%s\nSTATUS CODE: \t\t%s\nLAST MODIFIED: \t\t%s\nDATE ACCESSED: \t\t%s\nCONTENT TYPE: \t\t%s\nCONTENT LANGUAGE: \t%s\nRECEIVED BYTES: \t%s\n\n" \
+            % (self.__string_provided_url, self.__string_status_code, self.__string_last_modified, self.__string_current_date, self.__string_content_type, self.__string_content_language,self.__string_content_length_bytes))
+        file_general_data.write("EMAILS: \t\t%s\nHYPERLINKS: \t\t%s\nTAGS: \t\t\t%s\nSEARCHABLE TEXT: \t%s BYTES" \
+            % (self.__int_num_emails, self.__int_num_hyperlinks, self.__int_num_html_tags, self.__int_num_text))
+        file_general_data.close()
+
+        # Create the file to store the image links
+        file_image_data = open(os.getcwd() + "/../image_output.txt", 'w')
+        file_image_data.write("\n".join(self.__list_image_hyperlinks))
+        file_image_data.close()
+
+        # create the file to store the hypelinks
+        file_hyperlink_data = open(os.getcwd() + "/../hyperlink_output.txt", 'w')
+        file_hyperlink_data.write("\n".join(self.__list_hyperlinks))
+        file_hyperlink_data.close()
+
+        # Create the file to store the emails
+        file_email_data = open(os.getcwd() + "/../email_output.txt", 'w')
+        file_email_data.write("\n".join(self.__list_emails))
+        file_email_data.close()
+
+        # Create the file to store the plaintext
+        file_plaintext_data = open(os.getcwd() + "/../plaintext_output.txt", 'w')
+        file_plaintext_data.write(self.__string_webpage_plain_text)
+        file_plaintext_data.close()
+
+        # Create the file to store the tags
+        file_tag_data = open(os.getcwd() + "/../tag_output.txt", 'w')
+        file_tag_data.write("\n".join(self.__list_html_tags))
+        file_tag_data.close()
+
+        # Create the file to store the searched text
+        file_searched_data = open(os.getcwd() + "/../searched_output.txt", 'w')
+        file_searched_data.write("\n".join(self.__list_found_searched_strings))
+        file_searched_data.close()
+
+        return None
+
+
     # Displays a message for use when using the flag --verbose
     def __log(self, string_to_display, bool_display_condition):
         # This function will only display a message should bool_display_condition is ture
@@ -571,25 +706,8 @@ class Portan:
 def main():
     # Create the portan object, and pass the relevant switches
     list_to_pass = list(sys.argv)
-    # To account for building the program in an IDE
-    #list_to_pass.append(r"https://en.wikipedia.org/wiki/Linus")
-    #list_to_pass.append(r"https://www.youtube.com/watch?v=rei5vMQmD4Q")
-    list_to_pass.append(r"https://www.ohayosensei.com/current-edition.html")
-    #list_to_pass.append(r"https://stackoverflow.com/questions/6038061/regular-expression-to-find-urls-within-a-string")
-    #list_to_pass.append(r"https://en.wikipedia.org/wiki/Cat")
-    list_to_pass.append("--verbose")
-    list_to_pass.append("--emails")
-    list_to_pass.append("--hyperlinks")
-
     portan = Portan(list_to_pass)
     
-    # Check the actual links
-    #portan.get(r"https://www.youtube.com/watch?v=rei5vMQmD4Q")                                                  # EMAILS: 0; URLS: 48  # Excludes local links found in href="" tags
-    #portan.get(r"https://www.ohayosensei.com/current-edition.html")                                             # EMAILS: 113; URLS: 106
-    #portan.get(r"https://en.wikipedia.org/wiki/Linus")                                                          # EMAILS: 0; URLS: 26 
-    #portan.get(r"https://stackoverflow.com/questions/6038061/regular-expression-to-find-urls-within-a-string")  # EMAILS: 2; URLS: 192  # !Error, recognizes a url with an @ in it as email.
-    #portan.get(r"https://en.wikipedia.org/wiki/Cat")                                                            # EMAILS: 0; URLS: 472  
-
     return None
 
 
@@ -597,7 +715,5 @@ def main():
 main()
 
 
-# TODO:
-# Remove the URLS from the email list
-# 
-# Add in image link finding
+# TODO: 
+# Add in searching and writing
