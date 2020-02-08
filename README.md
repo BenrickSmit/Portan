@@ -23,4 +23,4 @@ further testing.
 Portan in licensed under [GPLv3](LICENSE).
 
 # Contributions
-In future donations might be welcomed, however, at this point in time, code contributions are more sought after.
+Code contributions are very welcome at this point.
