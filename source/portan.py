@@ -189,9 +189,9 @@ class Portan:
         if (self.__flag_write):
             self.write_files()
 
-	# This funciton only activates should the required argumnet be presented
-	if (self.__flag_plaintext):
-	    self.display_plaintext()
+        # This funciton only activates should the required argumnet be presented
+        if (self.__flag_plaintext):
+            self.display_plaintext(self.__flag_no_output)
 	
         return None
 
@@ -428,9 +428,9 @@ class Portan:
     # Display all plaintext
     def display_plaintext(self, bool_no_output = False):
         if (not bool_no_output):
-	    # Display the plaintext found on the webpage
-	    print("\n\nPLAINTEXT:\n---------")
-	    print(self.__string_webpage_plain_text)
+	        # Display the plaintext found on the webpage
+	        print("\n\nPLAINTEXT:\n---------")
+	        print(self.__string_webpage_plain_text)
 	
         return None
 
@@ -725,7 +725,3 @@ def main():
 
 # Run the main function
 main()
-
-
-# TODO: 
-# Add in searching and writing
