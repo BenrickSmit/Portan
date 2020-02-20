@@ -20,7 +20,7 @@ Note: Portan has only been tested with Wikipedia, Youtube, and a select number o
 further testing.
 
 # License
-Portan in licensed under [GPLv3](LICENSE).
+Portan is licensed under [GPLv3](LICENSE).
 
 # Contributions
 Code contributions are very welcome at this point.
