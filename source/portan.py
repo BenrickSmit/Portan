@@ -189,6 +189,10 @@ class Portan:
         if (self.__flag_write):
             self.write_files()
 
+	# This funciton only activates should the required argumnet be presented
+	if (self.__flag_plaintext):
+	    self.display_plaintext()
+	
         return None
 
 
@@ -421,6 +425,14 @@ class Portan:
                     print(element)
         return None
 
+    # Display all plaintext
+    def display_plaintext(self, bool_no_output = False):
+        if (not bool_no_output):
+	    # Display the plaintext found on the webpage
+	    print("\n\nPLAINTEXT:\n---------")
+	    print(self.__string_webpage_plain_text)
+	
+        return None
 
     # Separate the html tags from the normal text
     def _find_html_tags(self):
